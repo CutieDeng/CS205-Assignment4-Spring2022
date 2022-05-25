@@ -1,4 +1,1 @@
-*.out 
-*.o 
-*.cpp 
-^main.cpp
+*
