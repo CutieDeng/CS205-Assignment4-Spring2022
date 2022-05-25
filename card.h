@@ -1,9 +1,6 @@
 #pragma once
 
-/** 
- * You have no need to include to many unused codes. 
- */ 
-#include <iosfwd>
+#include <iostream> 
 #include <string> 
 #include <memory> 
 
@@ -17,12 +14,14 @@ class Player;
  */ 
 class Card {
 
+    friend class Player; 
+
     /** 
      * Why before define the public access for the data members? 
      * 
      * Boring, of course. 
      */ 
-    private: 
+    public: 
 
     /** 
      * The name of the card. 
@@ -83,7 +82,7 @@ class Card {
      * example:
      * name 100 200
      */
-    friend std::ostream& operator<<(std::ostream &os, Card const &card);
+    friend std::ostream &operator << (std::ostream &os, Card const &card);
 
     /** 
      * You must define a virtual deconstructor for avoiding warnings of compilers. 

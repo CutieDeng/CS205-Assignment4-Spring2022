@@ -33,7 +33,7 @@ class Player {
       */ 
     CardContainerType hand;
 
-    Player(CardContainerType &deck, std::string name); 
+    Player(CardContainerType &&deck, std::string name); 
     /**
      * Draw a card from the top [actually back] of the deck container. 
      */
@@ -56,29 +56,37 @@ class Player {
     struct InvalidIndextoFindCard : public std::logic_error {
         using std::logic_error::logic_error; 
 
-        template <char const *container_name, typename Container>  
+        template <typename container_name, typename Container>  
         static InvalidIndextoFindCard find_out_of_index (size_t index, Container const &container) {
             std::string error_message = "Invalid Index to Find the Card: Index("; 
             error_message.reserve(65); 
             error_message += std::to_string(index) ; 
             error_message += ") is out of the card container ["; 
-            error_message += container_name; 
+            error_message += container_name::str; 
             error_message += "] {begin: 0, end: "; 
             error_message += std::to_string(container.size()); 
             error_message += "}. "; 
             return InvalidIndextoFindCard(std::move(error_message)); 
         }
 
+        struct Deck {
+            static constexpr auto str = "deck"; 
+        }; 
+
         template <typename A, typename B> 
         static InvalidIndextoFindCard find_out_of_index_in_deck(A &&a, B &&b) {
-            return InvalidIndextoFindCard<"deck">(std::forward<A>(a), std::forward<B>(b)); 
+            return find_out_of_index<Deck>(std::forward<A>(a), std::forward<B>(b)); 
         }
+
+        struct Hand {
+            static constexpr auto str = "hand"; 
+        }; 
 
         template <typename A, typename B> 
         static InvalidIndextoFindCard find_out_of_index_in_hand(A &&a, B &&b) {
-            return InvalidIndextoFindCard<"hand">(std::forward<A>(a), std::forward<B>(b)); 
+            return find_out_of_index<Hand>(std::forward<A>(a), std::forward<B>(b)); 
         }
-    }
+    }; 
 
     /**
      * Display all cards in hand, every card is displayed
