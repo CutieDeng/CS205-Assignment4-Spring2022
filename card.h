@@ -20,9 +20,15 @@ class Card {
      * Why before define the public access for the data members? 
      * 
      * Boring, of course. 
+     * 
+     * --- 
+     * 
+     * Oh, I know, you cannot define it as protected / private for some reasons! 
+     * 
+     * It's not only the reason of laziness. 
      */ 
     public: 
-
+    
     /** 
      * The name of the card. 
      * 
@@ -36,6 +42,37 @@ class Card {
     int attack;
     // Defense value of card. 
     int defense;
+
+    /** 
+     * public method cancels the important causes for 'private' access control. 
+     * 
+     * But it seems I do not have another way to make the sub-class accessible to the sup-class. 
+     */ 
+
+    // public: 
+    // std::string &get_name() noexcept (true) {
+    //     return name; 
+    // }
+
+    // int &get_attack() noexcept(true) {
+    //     return attack; 
+    // }
+
+    // int &get_defense() noexcept(true) {
+    //     return defense; 
+    // }
+
+    // std::string const &get_name() const noexcept (true){
+    //     return name; 
+    // }
+
+    // int const &get_attack() const noexcept(true) {
+    //     return attack; 
+    // }
+
+    // int const &get_defense() const noexcept(true) {
+    //     return defense; 
+    // }
 
     public: 
 
