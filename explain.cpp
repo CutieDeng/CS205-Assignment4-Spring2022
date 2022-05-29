@@ -1,4 +1,5 @@
 #include <any> 
+#include <cassert> 
 #include <cstdint> 
 #include <filesystem> 
 #include <fstream> 
@@ -23,6 +24,8 @@ using i64 = int64_t;
 using u32 = uint32_t; 
 using u64 = uint64_t; 
 
+constexpr auto INFO_OUTPUT = false; 
+
 namespace TypeTrait {
 
     namespace Helper {
@@ -40,6 +43,7 @@ namespace TypeTrait {
         constexpr bool can_display = decltype(TypeTrait::Helper::display(t))::value;  
         if constexpr (can_display) {
             TypeTrait::Helper::display(t); 
+            std::cout << '\n'; 
         } else {
             std::clog << "[ERROR] Cannot display the object! Please finish the operator<< function for this object! \n"; 
         }
@@ -55,6 +59,18 @@ void display(std::any const &self) {
         TypeTrait::display(*str_ptr); 
     } else if (auto cstr_ptr = std::any_cast<char const *>(&self); cstr_ptr) {
         TypeTrait::display(*cstr_ptr); 
+    } else if (auto card_ptr = std::any_cast<Card>(&self); card_ptr) {
+        TypeTrait::display(*card_ptr); 
+    } else if (auto player_ptr = std::any_cast<Player>(&self); player_ptr) {
+        TypeTrait::display(*player_ptr); 
+    } else if (auto bool_ptr = std::any_cast<bool>(&self); bool_ptr) {
+        TypeTrait::display(*bool_ptr); 
+    } else if (auto double_ptr = std::any_cast<double>(&self); double_ptr) {
+        TypeTrait::display(*double_ptr); 
+    } else if (auto void_ptr = std::any_cast<std::monostate>(&self); void_ptr) {
+        std::cout << "void\n"; 
+    } else {
+        std::clog << "[ERROR] Cannot display the unknown type information! \n"; 
     }
 }
 
@@ -72,7 +88,8 @@ std::any generate_from_stream (std::istream &is, std::string_view file_name) {
         i32 index = 0; 
     }; 
     
-    static std::map<std::string, std::unique_ptr<Card>> origin_card_collection; 
+    // static std::map<std::string, std::unique_ptr<Card>> origin_card_collection; 
+    static std::map<std::string, std::any> origin_card_collection; 
 
     static std::map<std::string, std::function<std::any (std::string const &, std::vector<std::any> &)>> dealing_map = 
     {
@@ -99,20 +116,27 @@ std::any generate_from_stream (std::istream &is, std::string_view file_name) {
         {
             "CARD", 
             [](auto &&, auto &argu) {
+                if constexpr (INFO_OUTPUT) 
+                    std::clog << "[INFO] Invoke CARD construct with argu.size = " << argu.size() << '\n'; 
                 if (argu.empty()) 
                     throw ArgumentSizeNotEnough{}; 
                 if (argu.size() == 1) {
                     if (auto name_p = any_cast<std::string>(&argu.at(0)); name_p) {
                         if (auto fetch = origin_card_collection.find(*name_p); fetch != origin_card_collection.end()) {
-                            auto &&card = *fetch->second;
-                            // Need a dynamic analysis! 
-                            if (auto big_boss_card_p = dynamic_cast<BigBossCard*>(&card); big_boss_card_p) {
-                                return make_any<BigBossCard>(*big_boss_card_p); 
-                            } else if (auto exchange_card_p = dynamic_cast<ExchangeCard*>(&card); exchange_card_p) {
-                                return make_any<ExchangeCard>(*exchange_card_p); 
-                            } else {
-                                return make_any<Card>(card); 
-                            }
+                            // auto &&card = *fetch->second;
+                            // // Need a dynamic analysis! 
+                            // if (auto big_boss_card_p = dynamic_cast<BigBossCard*>(&card); big_boss_card_p) {
+                            //     return make_any<BigBossCard>(*big_boss_card_p); 
+                            // } else if (auto exchange_card_p = dynamic_cast<ExchangeCard*>(&card); exchange_card_p) {
+                            //     return make_any<ExchangeCard>(*exchange_card_p); 
+                            // } else {
+                            //     return make_any<Card>(card); 
+                            // }
+                            
+                            /** 
+                             * It's to complex to use unique pointer.  
+                             */ 
+                             return fetch->second; 
                         } 
                     } else {
                         throw ArgumentOperatorError{}; 
@@ -145,8 +169,44 @@ std::any generate_from_stream (std::istream &is, std::string_view file_name) {
 
                 Card c (card_name, attack, defence); 
 
-                origin_card_collection[card_name] = make_unique<Card>(c); 
+                origin_card_collection[card_name] = c; 
                 return make_any<Card>(std::move(c)); 
+            }
+        }, 
+        {
+            "DISPLAY", 
+            [](auto &&, auto &argu) {
+                if constexpr (INFO_OUTPUT)
+                    std::clog << "[INFO] Invoke Display! \n"; 
+                if (argu.empty()) 
+                    throw ArgumentSizeNotEnough{}; 
+                assert (argu.size() == 1); 
+                if (auto str_ptr = any_cast<std::string>(&argu.at(0)); str_ptr) {
+                    // attempt to match it! 
+                    if (auto card_ptr = origin_card_collection.find(*str_ptr); card_ptr != origin_card_collection.end()) {
+                        TypeTrait::display(any_cast<Card>(card_ptr->second)); 
+                        // display(*card_ptr); 
+                    } else if (auto player_ptr = 1; false) {
+                        
+                    } else {
+                        TypeTrait::display(*str_ptr); 
+                    }
+                } else {
+                    display(argu.at(0)); 
+                }
+                return make_any<std::monostate>(); 
+            }
+        }, 
+        {
+            "TRUE", 
+            [](auto &&, auto &) {
+                return true; 
+            }
+        }, 
+        {
+            "FALSE", 
+            [](auto &&, auto &) {
+                return false; 
             }
         }, 
     }; 
@@ -174,7 +234,47 @@ std::any generate_from_stream (std::istream &is, std::string_view file_name) {
             if (token.at(0) == '#') 
                 break;
             
-
+            {
+                auto it = dealing_map.find(token); 
+                if (it != dealing_map.end()) {
+                    command_collection.push_back({token, {}}); 
+                } else {
+                    // Check it as a double, or string! 
+                    if (!command_collection.empty()) {
+                        try {
+                            auto d = std::stod(token); 
+                            command_collection.back().second.push_back(d); 
+                        } catch (std::invalid_argument &) {
+                            command_collection.back().second.push_back(token); 
+                        }
+                    } else {
+                        std::clog << "Empty Command with argument '" << token << "'\n"; 
+                    }
+                }
+                try {
+                    if (command_collection.empty()) 
+                        continue; 
+                    std::any result; 
+                    result = dealing_map.find(command_collection.back().first)->second(token, command_collection.back().second); 
+                    command_collection.pop_back(); 
+                    if (auto void_ptr = any_cast<std::monostate>(&result); !void_ptr) {
+                        if (command_collection.empty()) {
+                            std::clog << "Get a value but Drop! The information of it: \n"; 
+                            ::display(result); 
+                        } else {
+                            command_collection.back().second.push_back(std::move(result)); 
+                        }
+                    }
+                } catch (ArgumentSizeNotEnough &) {
+                    // Skip it. 
+                } catch (ArgumentOperatorError &) {
+                    // Give a feed back for the false. 
+                    std::clog << "Attempt the command '" << command_collection.back().first << "' but fails with the confusing programming arguments! \n"; 
+                    command_collection.pop_back(); 
+                    if (!command_collection.empty())
+                        command_collection.back().second.push_back(std::monostate{}); 
+                } 
+            }
         }
     }
 
@@ -182,9 +282,10 @@ std::any generate_from_stream (std::istream &is, std::string_view file_name) {
 }
 
 int main() {
-    std::ifstream f (std::filesystem::path{"hello.txt"}); 
     std::cout.setf(std::ios::boolalpha); 
     std::clog.setf(std::ios::boolalpha); 
-    std::cout << f.is_open() << '\n'; 
-    display("12"); 
+
+    std::ifstream f (std::filesystem::path{"script.txt"}); 
+    if (f.is_open()) 
+        generate_from_stream(f, "script.txt"); 
 }
