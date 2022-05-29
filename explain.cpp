@@ -94,6 +94,15 @@ std::unique_ptr<Card> clone_unique_ptr_as_card(std::unique_ptr<Card> const &a) {
     } else return std::make_unique<Card>(*p); 
 }
 
+std::any clone_unique_ptr_as_any (std::unique_ptr<Card> const &a) {
+    auto p = a.get(); 
+    if (auto boss_ptr = dynamic_cast<BigBossCard*>(p); boss_ptr) {
+        return std::make_any<BigBossCard>(*boss_ptr); 
+    } else if (auto exchange_ptr = dynamic_cast<ExchangeCard*>(p); exchange_ptr) {
+        return std::make_any<ExchangeCard>(*exchange_ptr); 
+    } else return std::make_any<Card>(*p); 
+}
+
 std::any generate_from_stream (std::istream &is, std::string_view file_name) {
     std::string this_line; 
 
@@ -389,12 +398,60 @@ std::any generate_from_stream (std::istream &is, std::string_view file_name) {
                     } else {
                         std::cout << "Assert Fail! \n"; 
                     }
-                    return make_any<monostate>(); 
+                    return make_any<monostate>();
                 } catch (std::bad_any_cast &) {
                     throw ArgumentOperatorError{}; 
                 }
             }
         }, 
+        {
+            "DRAW", 
+            [] (auto &&, auto &argu) {
+                if (argu.empty()) 
+                    throw ArgumentSizeNotEnough{}; 
+                if (auto str = any_cast<std::string>(&argu.at(0)); str) {
+                    if (auto player_p = players.find(*str); player_p != players.end()) {
+                        argu.at(0) = &player_p->second; 
+                    }
+                }
+                if (auto play_p = any_cast<Player*>(&argu.at(0)); play_p) {
+                    (*play_p)->draw(); 
+                    return make_any<monostate>(); 
+                } else {
+                    throw ArgumentOperatorError{}; 
+                }
+            }
+        }, 
+        {
+            "PLAY", 
+            [] (auto &&, auto &argu) {
+                if (argu.size() < 2) 
+                    throw ArgumentSizeNotEnough{}; 
+                if (auto str = any_cast<std::string>(&argu.at(0)); str) {
+                    if (auto player_p = players.find(*str); player_p != players.end()) {
+                        argu.at(0) = &player_p->second; 
+                    }
+                }
+                try {
+                    auto player = any_cast<Player*>(argu.at(0)); 
+                    auto val = any_cast<double>(argu.at(1)); 
+                    if ((i64)val != val) {
+                        std::cout << "[WARNING] Input a floating value as index! \nJust truncate it as " << (i64)val << '\n'; 
+                    }
+                    auto result = player->play((i64)val); 
+                    if constexpr (std::is_same_v<decltype(result), Card>) {
+                        return make_any(result); 
+                    } else if (std::is_same_v<decltype(result), std::unique_ptr<Card>>) {
+                        return clone_unique_ptr_as_any(result); 
+                    } else {
+                        std::cout << "[ERROR] Invalid draw result realization! \n"; 
+                        throw ArgumentOperatorError{}; 
+                    }
+                } catch (std::bad_any_cast &) {
+                    throw ArgumentOperatorError{}; 
+                }
+            }
+        }
     }; 
 
     i64 line_id {};
