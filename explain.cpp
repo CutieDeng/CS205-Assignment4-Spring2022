@@ -183,6 +183,78 @@ std::any generate_from_stream (std::istream &is, std::string_view file_name) {
             }
         }, 
         {
+            "BIGBOSSCARD", 
+            [](auto &&, auto &argu) {
+                if constexpr (INFO_OUTPUT) 
+                    std::cout << "[INFO] Invoke BIGBOSSCARD construct with argu.size = " << argu.size() << '\n'; 
+
+                if (argu.size() < 3) 
+                    throw ArgumentSizeNotEnough{}; 
+                
+                std::string card_name; 
+                if (auto str_p = any_cast<std::string>(&argu.at(0)); str_p) {
+                    card_name = std::move(*str_p); 
+                }
+                else 
+                    throw ArgumentOperatorError{}; 
+
+                double attack; 
+                if (auto d_p = any_cast<double>(&argu.at(1)); d_p) {
+                    attack = *d_p; 
+                }
+                else 
+                    throw ArgumentOperatorError{}; 
+
+                double defence; 
+                if (auto d_p = any_cast<double>(&argu.at(2)); d_p) {
+                    defence = *d_p; 
+                }
+                else 
+                    throw ArgumentOperatorError{}; 
+
+                BigBossCard c (card_name, attack, defence); 
+
+                origin_card_collection[card_name] = c; 
+                return make_any<BigBossCard>(std::move(c)); 
+            }
+        }, 
+        {
+            "EXCHANGECARD", 
+            [](auto &&, auto &argu) {
+                if constexpr (INFO_OUTPUT) 
+                    std::cout << "[INFO] Invoke EXCHANGECARD construct with argu.size = " << argu.size() << '\n'; 
+
+                if (argu.size() < 3) 
+                    throw ArgumentSizeNotEnough{}; 
+                
+                std::string card_name; 
+                if (auto str_p = any_cast<std::string>(&argu.at(0)); str_p) {
+                    card_name = std::move(*str_p); 
+                }
+                else 
+                    throw ArgumentOperatorError{}; 
+
+                double attack; 
+                if (auto d_p = any_cast<double>(&argu.at(1)); d_p) {
+                    attack = *d_p; 
+                }
+                else 
+                    throw ArgumentOperatorError{}; 
+
+                double defence; 
+                if (auto d_p = any_cast<double>(&argu.at(2)); d_p) {
+                    defence = *d_p; 
+                }
+                else 
+                    throw ArgumentOperatorError{}; 
+
+                ExchangeCard c (card_name, attack, defence); 
+
+                origin_card_collection[card_name] = c; 
+                return make_any<ExchangeCard>(std::move(c)); 
+            }
+        }, 
+        {
             "CARD", 
             [](auto &&, auto &argu) {
                 if constexpr (INFO_OUTPUT) 
