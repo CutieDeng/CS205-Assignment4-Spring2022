@@ -1,0 +1,57 @@
+INCLUDE env.txt
+S CARD trivial1 32 6 
+S CARD defense 15 28
+S CARD attack! 99 0 
+S CARD attack 99.9 0 
+DISPLAY attack! 
+DISPLAY POWER attack attack! 
+
+DISPLAY ------
+ASSERTEQ POWER trivial1 defense 18
+
+DISPLAY ------
+S CARD normal 12 4
+S PLAYER cutie DECK normal normal normal attack! normal defense trivial1 end
+DISPLAY cutie
+
+DISPLAY ------ 
+DRAW cutie 
+DISPLAY cutie
+
+DISPLAY ------
+ASSERTEQ HANDSIZE cutie 6 
+ASSERTEQ DECKSIZE cutie 1
+
+DISPLAY ------
+DISPLAY PLAY cutie 0
+
+DISPLAY ------
+ASSERTEQ HANDSIZE cutie 5 
+ASSERTEQ DECKSIZE cutie 1
+
+DISPLAY ------ 
+S PLAYER leo-adventure DECK normal normal normal normal # BIGBOSSCARD hhh 999 999 end 
+    normal end 
+ASSERTEQ DECKSIZE leo-adventure 0 
+ASSERTEQ HANDSIZE leo-adventure 5
+
+DISPLAY ------ 
+S PLAY leo-adventure 4
+S PLAY leo-adventure 3
+S PLAY leo-adventure 2
+S PLAY leo-adventure 1
+S PLAY leo-adventure 0
+ASSERTEQ HANDSIZE leo-adventure 0 
+
+DISPLAY ------ 
+S PLAYER script DECK normal normal normal normal normal normal normal end 
+ASSERTEQ DECKSIZE script 2 
+
+ASSERTEQ POWER PLAY script 3 normal 10 
+ASSERTEQ DECKSIZE script 2 
+ASSERTEQ HANDSIZE script 4 
+
+DRAW script 
+ASSERTEQ DECKSIZE script 1 
+
+DISPLAY ------ 
