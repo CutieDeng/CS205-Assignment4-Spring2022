@@ -46,7 +46,7 @@ namespace TypeTrait {
             TypeTrait::Helper::display(t); 
             std::cout << '\n'; 
         } else {
-            std::clog << "[ERROR] Cannot display the object! Please finish the operator<< function for this object! \n"; 
+            std::cout << "[ERROR] Cannot display the object! Please finish the operator<< function for this object! \n"; 
         }
         return can_display; 
     }
@@ -71,10 +71,28 @@ void display(std::any const &self) {
     } else if (auto void_ptr = std::any_cast<std::monostate>(&self); void_ptr) {
         std::cout << "void\n"; 
     } else {
-        std::clog << "[ERROR] Cannot display the unknown type information! \n"; 
+        std::cout << "[ERROR] Cannot display the unknown type information! \n"; 
     }
 }
 
+std::unique_ptr<Card> make_from_any(std::any const &a) {
+    if (auto boss_ptr = std::any_cast<BigBossCard>(&a); boss_ptr) {
+        return std::make_unique<BigBossCard>(*boss_ptr); 
+    } else if (auto exchange_ptr = std::any_cast<ExchangeCard>(&a); exchange_ptr) {
+        return std::make_unique<ExchangeCard>(*exchange_ptr); 
+    } else if (auto card_ptr = std::any_cast<Card>(&a); card_ptr) {
+        return std::make_unique<Card>(*card_ptr); 
+    } else return nullptr; 
+}
+
+std::unique_ptr<Card> clone_unique_ptr_as_card(std::unique_ptr<Card> const &a) {
+    auto p = a.get(); 
+    if (auto boss_ptr = dynamic_cast<BigBossCard*>(p); boss_ptr) {
+        return std::make_unique<BigBossCard>(*boss_ptr); 
+    } else if (auto exchange_ptr = dynamic_cast<ExchangeCard*>(p); exchange_ptr) {
+        return std::make_unique<ExchangeCard>(*exchange_ptr); 
+    } else return std::make_unique<Card>(*p); 
+}
 
 std::any generate_from_stream (std::istream &is, std::string_view file_name) {
     std::string this_line; 
@@ -92,6 +110,7 @@ std::any generate_from_stream (std::istream &is, std::string_view file_name) {
     // static std::map<std::string, std::unique_ptr<Card>> origin_card_collection; 
     static std::map<std::string, std::any> origin_card_collection; 
     static std::map<std::string, std::string> command_alias; 
+    static std::map<std::string, Player> players; 
 
     static std::map<std::string, std::function<std::any (std::string const &, std::vector<std::any> &)>> dealing_map = 
     {
@@ -104,7 +123,7 @@ std::any generate_from_stream (std::istream &is, std::string_view file_name) {
                 std::filesystem::path file_path (*string_p); 
                 std::ifstream fs (file_path); 
                 if (!fs.is_open()) {
-                    std::clog << "[WARNING] INCLUDE command attempt to open the file '" << *string_p << "' but fails! \n"; 
+                    std::cout << "[WARNING] INCLUDE command attempt to open the file '" << *string_p << "' but fails! \n"; 
                     return make_any<std::monostate>(); 
                 }
                 return generate_from_stream(fs, *string_p); 
@@ -119,7 +138,7 @@ std::any generate_from_stream (std::istream &is, std::string_view file_name) {
             if (argu.empty()) 
                 throw ArgumentSizeNotEnough{}; 
             if constexpr (INFO_OUTPUT)
-                std::clog << "[INFO] Silent one output command. \n"; 
+                std::cout << "[INFO] Silent one output command. \n"; 
             return std::monostate{}; 
         }}, 
         {
@@ -158,7 +177,7 @@ std::any generate_from_stream (std::istream &is, std::string_view file_name) {
             "CARD", 
             [](auto &&, auto &argu) {
                 if constexpr (INFO_OUTPUT) 
-                    std::clog << "[INFO] Invoke CARD construct with argu.size = " << argu.size() << '\n'; 
+                    std::cout << "[INFO] Invoke CARD construct with argu.size = " << argu.size() << '\n'; 
                 if (argu.empty()) 
                     throw ArgumentSizeNotEnough{}; 
                 if (argu.size() == 1) {
@@ -218,7 +237,7 @@ std::any generate_from_stream (std::istream &is, std::string_view file_name) {
             "DISPLAY", 
             [](auto &&, auto &argu) {
                 if constexpr (INFO_OUTPUT)
-                    std::clog << "[INFO] Invoke Display! \n"; 
+                    std::cout << "[INFO] Invoke Display! \n"; 
                 if (argu.empty()) 
                     throw ArgumentSizeNotEnough{}; 
                 assert (argu.size() == 1); 
@@ -250,9 +269,113 @@ std::any generate_from_stream (std::istream &is, std::string_view file_name) {
                 return false; 
             }
         }, 
+        {
+            "POWER", 
+            [](auto &&, auto &argu) {
+                if (argu.size() < 2) 
+                    throw ArgumentSizeNotEnough{}; 
+                auto &card_obj = (argu.at(0)); 
+                if (auto str_ptr = any_cast<std::string>(&card_obj); str_ptr) {
+                    if (auto actual_card = origin_card_collection.find(*str_ptr); actual_card != origin_card_collection.end()) {
+                        card_obj = actual_card->second; 
+                    } else {
+                        throw ArgumentOperatorError{}; 
+                    }
+                }
+                Card *tmp_obj {any_cast<Card>(&card_obj)}; 
+                auto &card_obj2 = argu.at(1); 
+                if (auto str_ptr = any_cast<std::string>(&card_obj2); str_ptr) {
+                    if (auto actual_card = origin_card_collection.find(*str_ptr); actual_card != origin_card_collection.end()) {
+                        card_obj2 = actual_card->second; 
+                    } else {
+                        throw ArgumentOperatorError{}; 
+                    }
+                }
+                Card *tmp_obj2 {any_cast<Card>(&card_obj2)}; 
+                if (tmp_obj && tmp_obj2) 
+                    return tmp_obj->power(*tmp_obj2); 
+                else 
+                    throw ArgumentOperatorError{}; 
+            }
+        }, 
+        {
+            "DECK", 
+            [](auto &&, auto &argu) {
+                if (argu.empty() || argu.back().type() != typeid(std::string) || any_cast<std::string>(argu.back()) != "end") 
+                    throw ArgumentSizeNotEnough{}; 
+                if constexpr (INFO_OUTPUT)
+                    std::cout << "[INFO] Invoke DECK! \n"; 
+                std::vector<std::any> deck; 
+                for (size_t i{}; i + 1 < argu.size(); ++i) {
+                    if (auto str_p = any_cast<std::string>(&argu.at(i)); str_p) {
+                        if (auto card_p = origin_card_collection.find(*str_p); card_p != origin_card_collection.end()) {
+                            argu.at(i) = card_p->second; 
+                        }  
+                    }
+                    if (auto card_p = any_cast<Card>(&argu.at(i)); card_p) {
+                        deck.push_back(std::move(argu.at(i))); 
+                    } else {
+                        std::cout << "[WARNING] The obj cannot be added in the deck: \n"; 
+                        display(argu.at(i)); 
+                        std::cout << "------\n"; 
+                    }
+                }
+                return deck; 
+            }, 
+        }, 
+        {
+            "PLAYER", 
+            [](auto &&, auto &argu) -> std::any {
+                if (argu.size() == 1) {
+                    if (auto str = any_cast<std::string>(&argu.at(0)); str) {
+                        if (auto player_p = players.find(*str); player_p != players.end()) {
+                            return make_any<Player*>(&player_p->second); 
+                        }
+                    } else {
+                        throw ArgumentOperatorError{}; 
+                    }
+                }
+                if (argu.size() < 2) 
+                    throw ArgumentSizeNotEnough{}; 
+                try {
+                    std::string name = any_cast<std::string>(std::move(argu.at(0))); 
+                    auto deck = any_cast<std::vector<std::any>>(std::move(argu.at(1))); 
+                    using DeckType = decltype(Player::deck); 
+                    static_assert (!std::is_reference_v<DeckType>); 
+                    if constexpr (std::is_same_v<DeckType::value_type, Card>) {
+                        DeckType construct_deck; 
+                        for (auto &&i: deck) {
+                            if (auto card_cast = any_cast<Card>(&i); card_cast) {
+                                construct_deck.emplace_back(*card_cast); 
+                            }
+                        }
+                        auto r = players.emplace(std::make_tuple<std::string, Player>(std::string(name), Player{std::move(construct_deck), name})); 
+                        return make_any<Player*>(&r.first->second);
+                    } else if constexpr (std::is_same_v<DeckType::value_type, std::unique_ptr<Card>>) {
+                        DeckType construct_deck; 
+                        for (auto &&i: deck) {
+                            auto p = make_from_any(i); 
+                            if (p) 
+                                construct_deck.push_back(std::move(p)); 
+                        }
+                        auto r = players.emplace(std::make_tuple<std::string, Player>(std::string(name), Player{std::move(construct_deck), name})); 
+                        return make_any<Player*>(&r.first->second);
+                    } 
+                    std::cout << "[ERROR] Deck Type ERROR!!! \n"; 
+                    throw ArgumentOperatorError{}; 
+                } catch (std::bad_any_cast &) {
+                    throw ArgumentOperatorError{}; 
+                }
+                return make_any<monostate>(); 
+            }
+        }, 
     }; 
 
+    i64 line_id {};
+
     while (1) {
+
+        ++line_id; 
 
         getline(is, this_line); 
         if (!is) 
@@ -261,10 +384,8 @@ std::any generate_from_stream (std::istream &is, std::string_view file_name) {
         std::stringstream this_line_token_stream (std::move(this_line)); 
         std::string token; 
 
-        i64 line_id = -1;
 
         while (1) {
-            ++line_id; 
             this_line_token_stream >> token; 
 
             if (!this_line_token_stream) 
@@ -278,7 +399,7 @@ std::any generate_from_stream (std::istream &is, std::string_view file_name) {
                 break;
             
             {
-                // std::clog << "Find token (" << token << "). \n"; 
+                // std::cout << "Find token (" << token << "). \n"; 
                 start_deal: 
                 auto it = dealing_map.find(token); 
                 if (it != dealing_map.end()) {
@@ -296,7 +417,7 @@ std::any generate_from_stream (std::istream &is, std::string_view file_name) {
                             token = al_ptr->second; 
                             goto start_deal; 
                         } else {
-                            std::clog << "[WARNING] You input a command-style string, but it actually is not a COMMAND! \n"; 
+                            std::cout << "[WARNING] You input a command-style string, but it actually is not a COMMAND! \n"; 
                         }
                     }
                     // Check it as a double, or string! 
@@ -308,7 +429,7 @@ std::any generate_from_stream (std::istream &is, std::string_view file_name) {
                             command_collection.back().second.push_back(std::move(token)); 
                         }
                     } else {
-                        std::clog << "Empty Command with argument '" << token << "'\n"; 
+                        std::cout << "Empty Command with argument '" << token << "'\n"; 
                     }
                 }
                 try {
@@ -320,7 +441,7 @@ std::any generate_from_stream (std::istream &is, std::string_view file_name) {
                     command_collection.pop_back(); 
                     if (auto void_ptr = any_cast<std::monostate>(&result); !void_ptr) {
                         if (command_collection.empty()) {
-                            std::clog << "Get a value but Drop! The information of it: \n"; 
+                            std::cout << "Get a value but Drop! The information of it: \n"; 
                             ::display(result); 
                         } else {
                             command_collection.back().second.push_back(std::move(result)); 
@@ -331,7 +452,7 @@ std::any generate_from_stream (std::istream &is, std::string_view file_name) {
                     // Skip it. 
                 } catch (ArgumentOperatorError &) {
                     // Give a feed back for the false. 
-                    std::clog << "Attempt the command '" << command_collection.back().first << "' but fails with the confusing programming arguments! \nThe related command is nearly "
+                    std::cout << "Attempt the command '" << command_collection.back().first << "' but fails with the confusing programming arguments! \nThe related command is nearly "
                         << file_name << ":" << line_id << '\n'; 
                     command_collection.pop_back(); 
                     if (!command_collection.empty())
@@ -346,7 +467,6 @@ std::any generate_from_stream (std::istream &is, std::string_view file_name) {
 
 int main() {
     std::cout.setf(std::ios::boolalpha); 
-    std::clog.setf(std::ios::boolalpha); 
 
     std::ifstream f (std::filesystem::path{"script.txt"}); 
     if (f.is_open()) 
