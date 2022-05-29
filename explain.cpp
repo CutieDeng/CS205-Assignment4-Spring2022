@@ -1,3 +1,4 @@
+#include <algorithm> 
 #include <any> 
 #include <cassert> 
 #include <cstdint> 
@@ -90,6 +91,7 @@ std::any generate_from_stream (std::istream &is, std::string_view file_name) {
     
     // static std::map<std::string, std::unique_ptr<Card>> origin_card_collection; 
     static std::map<std::string, std::any> origin_card_collection; 
+    static std::map<std::string, std::string> command_alias; 
 
     static std::map<std::string, std::function<std::any (std::string const &, std::vector<std::any> &)>> dealing_map = 
     {
@@ -113,6 +115,45 @@ std::any generate_from_stream (std::istream &is, std::string_view file_name) {
         {"NOP", [](auto &&, auto &) {
             return std::monostate{}; 
         }}, 
+        {"SILENT", [](auto &&, auto &argu) {
+            if (argu.empty()) 
+                throw ArgumentSizeNotEnough{}; 
+            if constexpr (INFO_OUTPUT)
+                std::clog << "[INFO] Silent one output command. \n"; 
+            return std::monostate{}; 
+        }}, 
+        {
+            "COMMANDALIAS", [](auto &&, auto &argu) {
+                if (argu.size() < 2)    
+                    throw ArgumentSizeNotEnough{}; 
+                std::string origin, new_command_name; 
+                if (auto str_ptr = any_cast<std::string>(&argu.at(0)); str_ptr) 
+                    origin = std::move(*str_ptr); 
+                else {
+                    throw ArgumentOperatorError{}; 
+                } 
+                if (auto str_ptr = any_cast<std::string>(&argu.at(1)); str_ptr) 
+                    new_command_name = std::move(*str_ptr); 
+                else {
+                    throw ArgumentOperatorError{}; 
+                } 
+                for (auto &&o: origin) {
+                    if (o >= 'a' && o <= 'z') 
+                        o += 'A' - 'a'; 
+                }
+                for (auto &&o: new_command_name) {
+                    if (o >= 'a' && o <= 'z') 
+                        o += 'A' - 'a'; 
+                }
+                if (auto str = dealing_map.find(origin); str != dealing_map.end()) {
+                    // We can do the simple command alias! 
+                    command_alias[new_command_name] = std::move(origin); 
+                } else {
+                    throw ArgumentOperatorError{}; 
+                }
+                return make_any<monostate>(); 
+            }
+        }, 
         {
             "CARD", 
             [](auto &&, auto &argu) {
@@ -220,8 +261,10 @@ std::any generate_from_stream (std::istream &is, std::string_view file_name) {
         std::stringstream this_line_token_stream (std::move(this_line)); 
         std::string token; 
 
-        while (1) {
+        i64 line_id = -1;
 
+        while (1) {
+            ++line_id; 
             this_line_token_stream >> token; 
 
             if (!this_line_token_stream) 
@@ -235,23 +278,41 @@ std::any generate_from_stream (std::istream &is, std::string_view file_name) {
                 break;
             
             {
+                // std::clog << "Find token (" << token << "). \n"; 
+                start_deal: 
                 auto it = dealing_map.find(token); 
                 if (it != dealing_map.end()) {
-                    command_collection.push_back({token, {}}); 
+                    command_collection.push_back({std::move(token), {}}); 
                 } else {
+                    constexpr auto is_upper_totally = [](auto &s) -> bool {
+                        for (auto &&i: s) {
+                            if (i >= 'A' && i <= 'Z') {} 
+                            else return false; 
+                        }
+                        return true; 
+                    }; 
+                    if (is_upper_totally(token)) {
+                        if (auto al_ptr = command_alias.find(token); al_ptr != command_alias.end()) {
+                            token = al_ptr->second; 
+                            goto start_deal; 
+                        } else {
+                            std::clog << "[WARNING] You input a command-style string, but it actually is not a COMMAND! \n"; 
+                        }
+                    }
                     // Check it as a double, or string! 
                     if (!command_collection.empty()) {
                         try {
                             auto d = std::stod(token); 
                             command_collection.back().second.push_back(d); 
                         } catch (std::invalid_argument &) {
-                            command_collection.back().second.push_back(token); 
+                            command_collection.back().second.push_back(std::move(token)); 
                         }
                     } else {
                         std::clog << "Empty Command with argument '" << token << "'\n"; 
                     }
                 }
                 try {
+                    repeatedly: 
                     if (command_collection.empty()) 
                         continue; 
                     std::any result; 
@@ -265,11 +326,13 @@ std::any generate_from_stream (std::istream &is, std::string_view file_name) {
                             command_collection.back().second.push_back(std::move(result)); 
                         }
                     }
+                    goto repeatedly; 
                 } catch (ArgumentSizeNotEnough &) {
                     // Skip it. 
                 } catch (ArgumentOperatorError &) {
                     // Give a feed back for the false. 
-                    std::clog << "Attempt the command '" << command_collection.back().first << "' but fails with the confusing programming arguments! \n"; 
+                    std::clog << "Attempt the command '" << command_collection.back().first << "' but fails with the confusing programming arguments! \nThe related command is nearly "
+                        << file_name << ":" << line_id << '\n'; 
                     command_collection.pop_back(); 
                     if (!command_collection.empty())
                         command_collection.back().second.push_back(std::monostate{}); 
