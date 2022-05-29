@@ -243,11 +243,15 @@ std::any generate_from_stream (std::istream &is, std::string_view file_name) {
                 assert (argu.size() == 1); 
                 if (auto str_ptr = any_cast<std::string>(&argu.at(0)); str_ptr) {
                     // attempt to match it! 
-                    if (auto card_ptr = origin_card_collection.find(*str_ptr); card_ptr != origin_card_collection.end()) {
+                    auto card_ptr = origin_card_collection.find(*str_ptr);
+                    auto player_ptr = players.find(*str_ptr); 
+                    if (card_ptr != origin_card_collection.end() && player_ptr != players.end()) {
+                        std::cout << "[WARNING] ambiguous name for objects to display! \n"; 
+                        return make_any<monostate>(); 
+                    } else if (card_ptr != origin_card_collection.end()) {
                         TypeTrait::display(any_cast<Card>(card_ptr->second)); 
-                        // display(*card_ptr); 
-                    } else if (auto player_ptr = 1; false) {
-                        
+                    } else if (player_ptr != players.end()) {
+                        player_ptr->second.displayHand(); 
                     } else {
                         TypeTrait::display(*str_ptr); 
                     }
@@ -367,6 +371,28 @@ std::any generate_from_stream (std::istream &is, std::string_view file_name) {
                     throw ArgumentOperatorError{}; 
                 }
                 return make_any<monostate>(); 
+            }
+        }, 
+        {
+            "ASSERTEQ", 
+            [](auto &&, auto &argu) {
+                if (argu.size() < 2) 
+                    throw ArgumentSizeNotEnough{}; 
+                try {
+                    auto lhs = any_cast<double>(argu.at(0)); 
+                    auto rhs = any_cast<double>(argu.at(1)); 
+                    lhs -= rhs; 
+                    if (lhs < 0) 
+                        lhs = -lhs; 
+                    if (lhs <= std::numeric_limits<double>::epsilon()) {
+                        std::cout << "Assert Pass. \n";    
+                    } else {
+                        std::cout << "Assert Fail! \n"; 
+                    }
+                    return make_any<monostate>(); 
+                } catch (std::bad_any_cast &) {
+                    throw ArgumentOperatorError{}; 
+                }
             }
         }, 
     }; 
