@@ -219,6 +219,42 @@ std::any generate_from_stream (std::istream &is, std::string_view file_name) {
             }
         }, 
         {
+            "DECKSIZE", 
+            [](auto &&, auto &argu) {
+                if (argu.empty()) 
+                    throw ArgumentSizeNotEnough{}; 
+                if (auto str_p = any_cast<std::string>(&argu.at(0)); str_p) {
+                    if (auto player_ptr = players.find(*str_p); player_ptr != players.end()) {
+                        argu.at(0) = &player_ptr->second; 
+                    }
+                }
+                try {
+                    auto player = any_cast<Player*>(argu.at(0)); 
+                    return make_any<double>(player->deck.size()); 
+                } catch (std::bad_any_cast &) {
+                    throw ArgumentOperatorError{};
+                }
+            }
+        }, 
+        {
+            "HANDSIZE", 
+            [](auto &&, auto &argu) {
+                if (argu.empty()) 
+                    throw ArgumentSizeNotEnough{}; 
+                if (auto str_p = any_cast<std::string>(&argu.at(0)); str_p) {
+                    if (auto player_ptr = players.find(*str_p); player_ptr != players.end()) {
+                        argu.at(0) = &player_ptr->second; 
+                    }
+                }
+                try {
+                    auto player = any_cast<Player*>(argu.at(0)); 
+                    return make_any<double>(player->hand.size()); 
+                } catch (std::bad_any_cast &) {
+                    throw ArgumentOperatorError{};
+                }
+            }
+        }, 
+        {
             "EXCHANGECARD", 
             [](auto &&, auto &argu) {
                 if constexpr (INFO_OUTPUT) 
@@ -381,6 +417,43 @@ std::any generate_from_stream (std::istream &is, std::string_view file_name) {
                     return tmp_obj->power(*tmp_obj2); 
                 else 
                     throw ArgumentOperatorError{}; 
+            }
+        }, 
+        {
+            "EFFECT", 
+            [] (auto &&, auto &argu) {
+                if (argu.size() < 4) 
+                    throw ArgumentSizeNotEnough{}; 
+
+                if (auto str_p = any_cast<std::string>(&argu.at(1)); str_p) {
+                    if (auto player_ptr = players.find(*str_p); player_ptr != players.end()) {
+                        argu.at(1) = &player_ptr->second; 
+                    }
+                }
+                if (auto str_p = any_cast<std::string>(&argu.at(3)); str_p) {
+                    if (auto player_ptr = players.find(*str_p); player_ptr != players.end()) {
+                        argu.at(3) = &player_ptr->second; 
+                    }
+                }
+
+                if (auto str_p = any_cast<std::string>(&argu.at(0)); str_p) {
+                    if (auto card_p = origin_card_collection.find(*str_p); card_p != origin_card_collection.end()) {
+                        argu.at(0) = card_p->second; 
+                    }
+                }
+                if (auto str_p = any_cast<std::string>(&argu.at(2)); str_p) {
+                    if (auto card_p = origin_card_collection.find(*str_p); card_p != origin_card_collection.end()) {
+                        argu.at(2) = card_p->second; 
+                    }
+                }   
+                try {
+                    assert (any_cast<Card>(&argu.at(2))); 
+                    any_cast<Card>(argu.at(0)).effect(*any_cast<Card>(&argu.at(2)), *any_cast<Player*>(argu.at(1)), 
+                        *any_cast<Player*>(argu.at(3))); 
+                } catch (std::bad_any_cast &) {
+                    throw ArgumentOperatorError{}; 
+                }             
+                return make_any<monostate>(); 
             }
         }, 
         {
